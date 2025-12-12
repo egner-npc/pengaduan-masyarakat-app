@@ -1,0 +1,15 @@
+{
+  "expo": {
+    "name": "my-app",
+    "slug": "my-app",
+    "version": "1.0.0",
+    "extra": {
+      "eas": {
+        "projectId": "ccf49470-5552-4c92-bfa5-594b5746f0b1"
+      }
+    },
+    "android": {
+      "package": "com.jingga.myapp"
+    }
+  }
+}

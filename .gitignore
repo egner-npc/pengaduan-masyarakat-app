@@ -1,0 +1,21 @@
+# Backend
+backend/node_modules/
+backend/.env
+
+# React Native / Expo app
+my-app/node_modules/
+my-app/.expo/
+my-app/.expo-shared/
+my-app/android/
+my-app/ios/
+
+# Builds
+build/
+dist/
+
+# Logs
+*.log
+
+# OS files
+.DS_Store
+Thumbs.db
