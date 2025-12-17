@@ -3,70 +3,201 @@ const mysql = require('mysql2/promise');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const cors = require('cors');
-require('dotenv').config();
+
+// Load environment variables
+if (process.env.NODE_ENV !== 'production') {
+    require('dotenv').config();
+}
 
 const app = express();
-const PORT = process.env.PORT || 5000;
 
-// Middleware
-app.use(cors());
+// PORT untuk Railway harus 10000
+const PORT = process.env.PORT || 10000;
+
+// IMPORTANT: Enhanced CORS for mobile apps
+app.use(cors({
+    origin: '*', // Untuk testing, bisa ganti nanti dengan domain spesifik
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'Accept']
+}));
+
 app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 
-// Database connection
+// Database configuration for Railway
 const dbConfig = {
-    host: process.env.DB_HOST || 'localhost',
+    host: process.env.DB_HOST || 'mysql.railway.internal',
     user: process.env.DB_USER || 'root',
-    password: process.env.DB_PASSWORD || '',
-    database: process.env.DB_NAME || 'pengaduan_masyarakat'
+    password: process.env.DB_PASSWORD || 'HIaVpulxiNvSjqnCgdULvXKdEKjpnzGA',
+    database: process.env.DB_NAME || 'pengaduan_masyarakat_db',
+    port: parseInt(process.env.DB_PORT) || 3306,
+    waitForConnections: true,
+    connectionLimit: 10,
+    queueLimit: 0,
+    enableKeepAlive: true,
+    keepAliveInitialDelay: 0,
+    ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
 };
+
+console.log('🔧 Database Configuration:', {
+    host: dbConfig.host,
+    port: dbConfig.port,
+    database: dbConfig.database,
+    user: dbConfig.user,
+    env: process.env.NODE_ENV
+});
 
 // Create connection pool
 const pool = mysql.createPool(dbConfig);
 
+// Test database connection immediately
+pool.getConnection()
+    .then(connection => {
+        console.log('✅ Database connected successfully to:', dbConfig.host);
+        connection.release();
+    })
+    .catch(err => {
+        console.error('❌ Database connection FAILED!');
+        console.error('Error details:', {
+            code: err.code,
+            errno: err.errno,
+            sqlMessage: err.sqlMessage,
+            sqlState: err.sqlState
+        });
+        console.error('Full error:', err.message);
+        
+        // Log environment for debugging
+        console.log('Current environment variables:', {
+            DB_HOST: process.env.DB_HOST,
+            DB_PORT: process.env.DB_PORT,
+            DB_USER: process.env.DB_USER ? 'SET' : 'NOT SET',
+            DB_NAME: process.env.DB_NAME,
+            NODE_ENV: process.env.NODE_ENV
+        });
+    });
+
 // JWT Secret
-const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key';
+const JWT_SECRET = process.env.JWT_SECRET || 'your_fallback_secret_key_change_in_production';
 
 // Auth middleware
 const authenticateToken = async (req, res, next) => {
-    const authHeader = req.headers['authorization'];
-    const token = authHeader && authHeader.split(' ')[1];
-
-    if (!token) {
-        return res.status(401).json({ error: 'Access token required' });
-    }
-
     try {
+        const authHeader = req.headers['authorization'];
+        if (!authHeader) {
+            return res.status(401).json({ 
+                success: false,
+                error: 'Token tidak ditemukan. Silakan login kembali.' 
+            });
+        }
+
+        const token = authHeader.split(' ')[1];
+        if (!token) {
+            return res.status(401).json({ 
+                success: false,
+                error: 'Format token tidak valid.' 
+            });
+        }
+
         const decoded = jwt.verify(token, JWT_SECRET);
+        
         const [users] = await pool.execute(
             'SELECT id, nik, nama, email, telepon, alamat, role FROM users WHERE id = ?',
             [decoded.userId]
         );
-        
+
         if (users.length === 0) {
-            return res.status(403).json({ error: 'User not found' });
+            return res.status(403).json({ 
+                success: false,
+                error: 'User tidak ditemukan.' 
+            });
         }
 
         req.user = users[0];
         next();
     } catch (error) {
-        return res.status(403).json({ error: 'Invalid token' });
+        console.error('Auth middleware error:', error.message);
+        
+        if (error.name === 'TokenExpiredError') {
+            return res.status(401).json({ 
+                success: false,
+                error: 'Token telah kadaluarsa. Silakan login kembali.' 
+            });
+        }
+        
+        if (error.name === 'JsonWebTokenError') {
+            return res.status(401).json({ 
+                success: false,
+                error: 'Token tidak valid.' 
+            });
+        }
+        
+        return res.status(500).json({ 
+            success: false,
+            error: 'Terjadi kesalahan dalam autentikasi.' 
+        });
     }
 };
 
-// Routes
+// ==================== ROUTES ====================
 
-// Register
+// Health check endpoint - IMPORTANT for Railway
+app.get('/api/health', async (req, res) => {
+    try {
+        const [result] = await pool.execute('SELECT 1 as status');
+        res.json({ 
+            success: true,
+            status: 'healthy', 
+            database: 'connected',
+            environment: process.env.NODE_ENV,
+            timestamp: new Date().toISOString(),
+            port: PORT
+        });
+    } catch (error) {
+        console.error('Health check failed:', error.message);
+        res.status(500).json({ 
+            success: false,
+            status: 'unhealthy', 
+            database: 'disconnected',
+            error: error.message,
+            timestamp: new Date().toISOString()
+        });
+    }
+});
+
+// Root endpoint
+app.get('/', (req, res) => {
+    res.json({
+        success: true,
+        message: 'API Pengaduan Masyarakt',
+        version: '1.0.0',
+        environment: process.env.NODE_ENV,
+        endpoints: {
+            auth: '/api/login, /api/register',
+            complaints: '/api/complaints, /api/my-complaints',
+            health: '/api/health'
+        }
+    });
+});
+
+// Register endpoint
 app.post('/api/register', async (req, res) => {
     try {
         const { nik, nama, email, password, telepon, alamat } = req.body;
 
         // Validation
         if (!nik || !nama || !email || !password) {
-            return res.status(400).json({ error: 'Semua field wajib diisi' });
+            return res.status(400).json({ 
+                success: false,
+                error: 'Semua field wajib diisi: NIK, Nama, Email, Password' 
+            });
         }
 
         if (nik.length !== 16) {
-            return res.status(400).json({ error: 'NIK harus 16 digit' });
+            return res.status(400).json({ 
+                success: false,
+                error: 'NIK harus 16 digit' 
+            });
         }
 
         // Check if user exists
@@ -76,7 +207,10 @@ app.post('/api/register', async (req, res) => {
         );
 
         if (existingUsers.length > 0) {
-            return res.status(400).json({ error: 'Email atau NIK sudah terdaftar' });
+            return res.status(400).json({ 
+                success: false,
+                error: 'Email atau NIK sudah terdaftar' 
+            });
         }
 
         // Hash password
@@ -84,27 +218,34 @@ app.post('/api/register', async (req, res) => {
 
         // Insert user
         const [result] = await pool.execute(
-            'INSERT INTO users (nik, nama, email, password, telepon, alamat) VALUES (?, ?, ?, ?, ?, ?)',
-            [nik, nama, email, hashedPassword, telepon, alamat]
+            'INSERT INTO users (nik, nama, email, password, telepon, alamat, role) VALUES (?, ?, ?, ?, ?, ?, ?)',
+            [nik, nama, email, hashedPassword, telepon, alamat, 'masyarakat']
         );
 
         res.status(201).json({
+            success: true,
             message: 'Registrasi berhasil',
             userId: result.insertId
         });
     } catch (error) {
         console.error('Registration error:', error);
-        res.status(500).json({ error: 'Internal server error' });
+        res.status(500).json({ 
+            success: false,
+            error: 'Terjadi kesalahan server. Silakan coba lagi.' 
+        });
     }
 });
 
-// Login
+// Login endpoint
 app.post('/api/login', async (req, res) => {
     try {
         const { email, password } = req.body;
 
         if (!email || !password) {
-            return res.status(400).json({ error: 'Email dan password wajib diisi' });
+            return res.status(400).json({ 
+                success: false,
+                error: 'Email dan password wajib diisi' 
+            });
         }
 
         // Find user
@@ -114,7 +255,10 @@ app.post('/api/login', async (req, res) => {
         );
 
         if (users.length === 0) {
-            return res.status(401).json({ error: 'Email atau password salah' });
+            return res.status(401).json({ 
+                success: false,
+                error: 'Email atau password salah' 
+            });
         }
 
         const user = users[0];
@@ -122,17 +266,25 @@ app.post('/api/login', async (req, res) => {
         // Check password
         const validPassword = await bcrypt.compare(password, user.password);
         if (!validPassword) {
-            return res.status(401).json({ error: 'Email atau password salah' });
+            return res.status(401).json({ 
+                success: false,
+                error: 'Email atau password salah' 
+            });
         }
 
         // Generate token
         const token = jwt.sign(
-            { userId: user.id, email: user.email },
+            { 
+                userId: user.id, 
+                email: user.email,
+                role: user.role
+            },
             JWT_SECRET,
-            { expiresIn: '24h' }
+            { expiresIn: '7d' } // 7 hari
         );
 
         res.json({
+            success: true,
             message: 'Login berhasil',
             token,
             user: {
@@ -147,41 +299,62 @@ app.post('/api/login', async (req, res) => {
         });
     } catch (error) {
         console.error('Login error:', error);
-        res.status(500).json({ error: 'Internal server error' });
+        res.status(500).json({ 
+            success: false,
+            error: 'Terjadi kesalahan server. Silakan coba lagi.' 
+        });
     }
 });
 
-// Get user profile
+// Profile endpoint
 app.get('/api/profile', authenticateToken, async (req, res) => {
-    res.json({ user: req.user });
+    try {
+        res.json({ 
+            success: true,
+            user: req.user 
+        });
+    } catch (error) {
+        console.error('Profile error:', error);
+        res.status(500).json({ 
+            success: false,
+            error: 'Terjadi kesalahan server.' 
+        });
+    }
 });
 
-// Create complaint
+// Create complaint endpoint
 app.post('/api/complaints', authenticateToken, async (req, res) => {
     try {
         const { judul, isi_laporan, lokasi, kategori, foto } = req.body;
         const userId = req.user.id;
 
         if (!judul || !isi_laporan || !kategori) {
-            return res.status(400).json({ error: 'Judul, isi laporan, dan kategori wajib diisi' });
+            return res.status(400).json({ 
+                success: false,
+                error: 'Judul, isi laporan, dan kategori wajib diisi' 
+            });
         }
 
         const [result] = await pool.execute(
             'INSERT INTO complaints (user_id, judul, isi_laporan, lokasi, kategori, foto) VALUES (?, ?, ?, ?, ?, ?)',
-            [userId, judul, isi_laporan, lokasi, kategori, foto]
+            [userId, judul, isi_laporan, lokasi, kategori, foto || null]
         );
 
         res.status(201).json({
+            success: true,
             message: 'Pengaduan berhasil dikirim',
             complaintId: result.insertId
         });
     } catch (error) {
         console.error('Create complaint error:', error);
-        res.status(500).json({ error: 'Internal server error' });
+        res.status(500).json({ 
+            success: false,
+            error: 'Gagal mengirim pengaduan. Silakan coba lagi.' 
+        });
     }
 });
 
-// Get user complaints
+// Get user complaints endpoint
 app.get('/api/my-complaints', authenticateToken, async (req, res) => {
     try {
         const userId = req.user.id;
@@ -194,18 +367,27 @@ app.get('/api/my-complaints', authenticateToken, async (req, res) => {
             [userId]
         );
 
-        res.json({ complaints });
+        res.json({ 
+            success: true,
+            complaints: complaints || []
+        });
     } catch (error) {
         console.error('Get complaints error:', error);
-        res.status(500).json({ error: 'Internal server error' });
+        res.status(500).json({ 
+            success: false,
+            error: 'Gagal mengambil data pengaduan.' 
+        });
     }
 });
 
-// Get all complaints (for admin)
+// Get all complaints (admin only)
 app.get('/api/complaints', authenticateToken, async (req, res) => {
     try {
         if (req.user.role !== 'admin') {
-            return res.status(403).json({ error: 'Akses ditolak' });
+            return res.status(403).json({ 
+                success: false,
+                error: 'Akses ditolak. Hanya admin yang bisa mengakses.' 
+            });
         }
 
         const [complaints] = await pool.execute(
@@ -215,36 +397,16 @@ app.get('/api/complaints', authenticateToken, async (req, res) => {
              ORDER BY c.created_at DESC`
         );
 
-        res.json({ complaints });
+        res.json({ 
+            success: true,
+            complaints: complaints || []
+        });
     } catch (error) {
         console.error('Get all complaints error:', error);
-        res.status(500).json({ error: 'Internal server error' });
-    }
-});
-
-// Update complaint status (admin only)
-app.put('/api/complaints/:id', authenticateToken, async (req, res) => {
-    try {
-        if (req.user.role !== 'admin') {
-            return res.status(403).json({ error: 'Akses ditolak' });
-        }
-
-        const { status, tanggapan } = req.body;
-        const complaintId = req.params.id;
-
-        const [result] = await pool.execute(
-            'UPDATE complaints SET status = ?, tanggapan = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
-            [status, tanggapan, complaintId]
-        );
-
-        if (result.affectedRows === 0) {
-            return res.status(404).json({ error: 'Pengaduan tidak ditemukan' });
-        }
-
-        res.json({ message: 'Status pengaduan berhasil diperbarui' });
-    } catch (error) {
-        console.error('Update complaint error:', error);
-        res.status(500).json({ error: 'Internal server error' });
+        res.status(500).json({ 
+            success: false,
+            error: 'Gagal mengambil data pengaduan.' 
+        });
     }
 });
 
@@ -261,22 +423,111 @@ app.get('/api/complaints/:id', authenticateToken, async (req, res) => {
         );
 
         if (complaints.length === 0) {
-            return res.status(404).json({ error: 'Pengaduan tidak ditemukan' });
+            return res.status(404).json({ 
+                success: false,
+                error: 'Pengaduan tidak ditemukan' 
+            });
         }
 
         // Check if user owns the complaint or is admin
         if (req.user.role !== 'admin' && complaints[0].user_id !== req.user.id) {
-            return res.status(403).json({ error: 'Akses ditolak' });
+            return res.status(403).json({ 
+                success: false,
+                error: 'Akses ditolak. Anda tidak memiliki izin.' 
+            });
         }
 
-        res.json({ complaint: complaints[0] });
+        res.json({ 
+            success: true,
+            complaint: complaints[0] 
+        });
     } catch (error) {
         console.error('Get complaint error:', error);
-        res.status(500).json({ error: 'Internal server error' });
+        res.status(500).json({ 
+            success: false,
+            error: 'Gagal mengambil detail pengaduan.' 
+        });
     }
 });
 
+// Update complaint status (admin only)
+app.put('/api/complaints/:id', authenticateToken, async (req, res) => {
+    try {
+        if (req.user.role !== 'admin') {
+            return res.status(403).json({ 
+                success: false,
+                error: 'Akses ditolak. Hanya admin yang bisa mengupdate status.' 
+            });
+        }
+
+        const { status, tanggapan } = req.body;
+        const complaintId = req.params.id;
+
+        if (!status || !['pending', 'diproses', 'selesai', 'ditolak'].includes(status)) {
+            return res.status(400).json({ 
+                success: false,
+                error: 'Status tidak valid. Pilih: pending, diproses, selesai, atau ditolak' 
+            });
+        }
+
+        const [result] = await pool.execute(
+            'UPDATE complaints SET status = ?, tanggapan = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?',
+            [status, tanggapan || null, complaintId]
+        );
+
+        if (result.affectedRows === 0) {
+            return res.status(404).json({ 
+                success: false,
+                error: 'Pengaduan tidak ditemukan' 
+            });
+        }
+
+        res.json({ 
+            success: true,
+            message: 'Status pengaduan berhasil diperbarui' 
+        });
+    } catch (error) {
+        console.error('Update complaint error:', error);
+        res.status(500).json({ 
+            success: false,
+            error: 'Gagal memperbarui status pengaduan.' 
+        });
+    }
+});
+
+// 404 handler
+app.use('*', (req, res) => {
+    res.status(404).json({
+        success: false,
+        error: 'Endpoint tidak ditemukan',
+        path: req.originalUrl
+    });
+});
+
+// Error handling middleware
+app.use((err, req, res, next) => {
+    console.error('Unhandled error:', err);
+    res.status(500).json({
+        success: false,
+        error: 'Terjadi kesalahan internal server'
+    });
+});
+
 // Start server
-app.listen(PORT, () => {
-    console.log(`Server berjalan di port ${PORT}`);
+const server = app.listen(PORT, '0.0.0.0', () => {
+    console.log('========================================');
+    console.log(`✅ Server berjalan di port ${PORT}`);
+    console.log(`📡 Environment: ${process.env.NODE_ENV}`);
+    console.log(`🌐 URL: http://0.0.0.0:${PORT}`);
+    console.log(`🔗 Health check: /api/health`);
+    console.log('========================================');
+});
+
+// Handle graceful shutdown
+process.on('SIGTERM', () => {
+    console.log('SIGTERM signal received: closing HTTP server');
+    server.close(() => {
+        console.log('HTTP server closed');
+        pool.end();
+    });
 });
