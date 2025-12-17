@@ -61,7 +61,7 @@ const ComplaintDetailScreen = ({ route, navigation }) => {
       });
       
       Alert.alert('Sukses', 'Status pengaduan berhasil diperbarui');
-      loadComplaintDetail();
+      loadComplaintDetail(); // Reload data
     } catch (error) {
       console.error('Error updating complaint:', error);
       Alert.alert('Error', 'Gagal memperbarui status pengaduan');
@@ -104,11 +104,13 @@ const ComplaintDetailScreen = ({ route, navigation }) => {
 
   return (
     <ScrollView style={styles.container}>
+      {/* Complaint Details */}
       <Card style={styles.card}>
         <Card.Content>
           <View style={styles.header}>
             <Title style={styles.title}>{complaint.judul}</Title>
             <Chip
+              mode="outlined"
               textStyle={{ color: 'white', fontSize: 12 }}
               style={[styles.statusChip, { backgroundColor: getStatusColor(complaint.status) }]}
             >
@@ -153,7 +155,7 @@ const ComplaintDetailScreen = ({ route, navigation }) => {
               <Button
                 mode="outlined"
                 icon="image"
-                onPress={() => Alert.alert('Info', 'Fitur preview foto akan datang')}
+                onPress={() => {/* Handle image view */}}
                 style={styles.imageButton}
               >
                 Lihat Foto
@@ -163,6 +165,7 @@ const ComplaintDetailScreen = ({ route, navigation }) => {
         </Card.Content>
       </Card>
 
+      {/* Response Section */}
       {complaint.tanggapan && (
         <Card style={[styles.card, styles.responseCard]}>
           <Card.Content>
@@ -177,6 +180,7 @@ const ComplaintDetailScreen = ({ route, navigation }) => {
         </Card>
       )}
 
+      {/* Admin Controls */}
       {user.role === 'admin' && (
         <Card style={styles.adminCard}>
           <Card.Content>

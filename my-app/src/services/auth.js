@@ -31,12 +31,12 @@ export const AuthProvider = ({ children }) => {
         try {
           await api.get('/profile');
         } catch (error) {
-          console.log('Token invalid, logging out');
+          console.log('Token invalid, logging out...');
           logout();
         }
       }
     } catch (error) {
-      console.log('Auth check failed:', error);
+      console.log('Auth check failed:', error.message);
       logout();
     } finally {
       setIsLoading(false);
@@ -48,8 +48,11 @@ export const AuthProvider = ({ children }) => {
       const response = await api.post('/login', { email, password });
       const { token, user } = response.data;
 
+      // Simpan ke AsyncStorage
       await AsyncStorage.setItem('token', token);
       await AsyncStorage.setItem('user', JSON.stringify(user));
+      
+      // Update state
       setUser(user);
 
       return { success: true };
@@ -77,10 +80,10 @@ export const AuthProvider = ({ children }) => {
     try {
       await AsyncStorage.removeItem('token');
       await AsyncStorage.removeItem('user');
-      setUser(null);
     } catch (error) {
-      console.log('Logout error:', error);
+      console.log('Error clearing storage:', error);
     }
+    setUser(null);
   };
 
   const value = {

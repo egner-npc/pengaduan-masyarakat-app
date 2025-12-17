@@ -15,8 +15,6 @@ import {
   ActivityIndicator,
   Chip,
   Paragraph,
-  Menu,
-  Provider as PaperProvider,
 } from 'react-native-paper';
 import { useAuth } from '../services/auth';
 import api from '../services/api';
@@ -26,7 +24,6 @@ const DashboardScreen = ({ navigation }) => {
   const [complaints, setComplaints] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [menuVisible, setMenuVisible] = useState(false);
   const { user, logout } = useAuth();
 
   const loadComplaints = async () => {
@@ -81,161 +78,130 @@ const DashboardScreen = ({ navigation }) => {
   }
 
   return (
-    <PaperProvider>
-      <View style={styles.container}>
-        <ScrollView
-          refreshControl={
-            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-          }
-        >
-          {/* Header */}
-          <Card style={styles.headerCard}>
-            <Card.Content>
-              <View style={styles.headerRow}>
-                <View style={styles.headerText}>
-                  <Title style={styles.welcomeTitle}>
-                    Selamat Datang, {user.nama}!
-                  </Title>
-                  <Paragraph style={styles.welcomeSubtitle}>
-                    {user.role === 'admin' 
-                      ? 'Anda login sebagai Administrator' 
-                      : 'Ayo laporkan masalah di lingkungan Anda'
-                    }
-                  </Paragraph>
-                </View>
-                <Menu
-                  visible={menuVisible}
-                  onDismiss={() => setMenuVisible(false)}
-                  anchor={
-                    <Button 
-                      icon="dots-vertical" 
-                      onPress={() => setMenuVisible(true)}
-                      mode="text"
-                      textColor="#fff"
-                    >
-                      Menu
-                    </Button>
-                  }>
-                  <Menu.Item onPress={handleLogout} title="Keluar" />
-                </Menu>
+    <View style={styles.container}>
+      <ScrollView
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+        }
+      >
+        {/* Header */}
+        <Card style={styles.headerCard}>
+          <Card.Content>
+            <Title style={styles.welcomeTitle}>
+              Selamat Datang, {user.nama}!
+            </Title>
+            <Paragraph style={styles.welcomeSubtitle}>
+              {user.role === 'admin' 
+                ? 'Anda login sebagai Administrator' 
+                : 'Ayo laporkan masalah di lingkungan Anda'
+              }
+            </Paragraph>
+            <View style={styles.statsContainer}>
+              <View style={styles.statItem}>
+                <Text style={styles.statNumber}>{complaints.length}</Text>
+                <Text style={styles.statLabel}>Total Pengaduan</Text>
               </View>
-              
-              <View style={styles.statsContainer}>
-                <View style={styles.statItem}>
-                  <Text style={styles.statNumber}>{complaints.length}</Text>
-                  <Text style={styles.statLabel}>Total Pengaduan</Text>
-                </View>
-                <View style={styles.statItem}>
-                  <Text style={styles.statNumber}>
-                    {complaints.filter(c => c.status === 'selesai').length}
-                  </Text>
-                  <Text style={styles.statLabel}>Selesai</Text>
-                </View>
-                <View style={styles.statItem}>
-                  <Text style={styles.statNumber}>
-                    {complaints.filter(c => c.status === 'diproses').length}
-                  </Text>
-                  <Text style={styles.statLabel}>Diproses</Text>
-                </View>
+              <View style={styles.statItem}>
+                <Text style={styles.statNumber}>
+                  {complaints.filter(c => c.status === 'selesai').length}
+                </Text>
+                <Text style={styles.statLabel}>Selesai</Text>
               </View>
-            </Card.Content>
-          </Card>
-
-          {/* Complaint List */}
-          <View style={styles.complaintsSection}>
-            <View style={styles.sectionHeader}>
-              <Title style={styles.sectionTitle}>
-                {user.role === 'admin' ? 'Semua Pengaduan' : 'Pengaduan Saya'}
-              </Title>
-              <Button
-                icon="refresh"
-                onPress={onRefresh}
-                mode="outlined"
-                compact
-                loading={refreshing}
-              >
-                Refresh
-              </Button>
             </View>
+          </Card.Content>
+        </Card>
 
-            {complaints.length === 0 ? (
-              <Card style={styles.emptyCard}>
-                <Card.Content style={styles.emptyContent}>
-                  <Text style={styles.emptyText}>
-                    {user.role === 'admin' 
-                      ? 'Belum ada pengaduan' 
-                      : 'Belum ada pengaduan yang dikirim'
-                    }
-                  </Text>
-                  {user.role !== 'admin' && (
-                    <Button
-                      mode="contained"
-                      onPress={() => navigation.navigate('ComplaintForm')}
-                      style={styles.emptyButton}
-                      icon="plus"
+        {/* Complaint List */}
+        <View style={styles.complaintsSection}>
+          <View style={styles.sectionHeader}>
+            <Title style={styles.sectionTitle}>
+              {user.role === 'admin' ? 'Semua Pengaduan' : 'Pengaduan Saya'}
+            </Title>
+            <Button
+              mode="outlined"
+              onPress={handleLogout}
+              compact
+              icon="logout"
+            >
+              Keluar
+            </Button>
+          </View>
+
+          {complaints.length === 0 ? (
+            <Card style={styles.emptyCard}>
+              <Card.Content style={styles.emptyContent}>
+                <Text style={styles.emptyText}>
+                  {user.role === 'admin' 
+                    ? 'Belum ada pengaduan' 
+                    : 'Belum ada pengaduan yang dikirim'
+                  }
+                </Text>
+                {user.role !== 'admin' && (
+                  <Button
+                    mode="contained"
+                    onPress={() => navigation.navigate('ComplaintForm')}
+                    style={styles.emptyButton}
+                  >
+                    Buat Pengaduan Pertama
+                  </Button>
+                )}
+              </Card.Content>
+            </Card>
+          ) : (
+            complaints.map((complaint) => (
+              <Card
+                key={complaint.id}
+                style={styles.complaintCard}
+                onPress={() => navigation.navigate('ComplaintDetail', { complaintId: complaint.id })}
+              >
+                <Card.Content>
+                  <View style={styles.complaintHeader}>
+                    <Title style={styles.complaintTitle} numberOfLines={2}>
+                      {complaint.judul}
+                    </Title>
+                    <Chip
+                      mode="outlined"
+                      textStyle={{ color: 'white', fontSize: 12 }}
+                      style={[styles.statusChip, { backgroundColor: getStatusColor(complaint.status) }]}
                     >
-                      Buat Pengaduan Pertama
-                    </Button>
+                      {getStatusLabel(complaint.status)}
+                    </Chip>
+                  </View>
+                  
+                  <Paragraph style={styles.complaintContent} numberOfLines={3}>
+                    {complaint.isi_laporan}
+                  </Paragraph>
+                  
+                  <View style={styles.complaintFooter}>
+                    <Text style={styles.complaintMeta}>
+                      {complaint.lokasi}
+                    </Text>
+                    <Text style={styles.complaintDate}>
+                      {new Date(complaint.created_at).toLocaleDateString('id-ID')}
+                    </Text>
+                  </View>
+
+                  {user.role === 'admin' && (
+                    <Text style={styles.complaintUser}>
+                      Oleh: {complaint.user_nama} ({complaint.user_nik})
+                    </Text>
                   )}
                 </Card.Content>
               </Card>
-            ) : (
-              complaints.map((complaint) => (
-                <Card
-                  key={complaint.id}
-                  style={styles.complaintCard}
-                  onPress={() => navigation.navigate('ComplaintDetail', { complaintId: complaint.id })}
-                >
-                  <Card.Content>
-                    <View style={styles.complaintHeader}>
-                      <Title style={styles.complaintTitle} numberOfLines={2}>
-                        {complaint.judul}
-                      </Title>
-                      <Chip
-                        mode="outlined"
-                        textStyle={{ color: 'white', fontSize: 12 }}
-                        style={[styles.statusChip, { backgroundColor: getStatusColor(complaint.status) }]}
-                      >
-                        {getStatusLabel(complaint.status)}
-                      </Chip>
-                    </View>
-                    
-                    <Paragraph style={styles.complaintContent} numberOfLines={3}>
-                      {complaint.isi_laporan}
-                    </Paragraph>
-                    
-                    <View style={styles.complaintFooter}>
-                      <Text style={styles.complaintMeta}>
-                        {complaint.lokasi}
-                      </Text>
-                      <Text style={styles.complaintDate}>
-                        {new Date(complaint.created_at).toLocaleDateString('id-ID')}
-                      </Text>
-                    </View>
+            ))
+          )}
+        </View>
+      </ScrollView>
 
-                    {user.role === 'admin' && (
-                      <Text style={styles.complaintUser}>
-                        Oleh: {complaint.user_nama} ({complaint.user_nik})
-                      </Text>
-                    )}
-                  </Card.Content>
-                </Card>
-              ))
-            )}
-          </View>
-        </ScrollView>
-
-        {/* Floating Action Button */}
-        {user.role !== 'admin' && (
-          <FAB
-            style={styles.fab}
-            icon="plus"
-            onPress={() => navigation.navigate('ComplaintForm')}
-            color="white"
-          />
-        )}
-      </View>
-    </PaperProvider>
+      {/* Floating Action Button */}
+      {user.role !== 'admin' && (
+        <FAB
+          style={styles.fab}
+          icon="plus"
+          onPress={() => navigation.navigate('ComplaintForm')}
+        />
+      )}
+    </View>
   );
 };
 
@@ -257,15 +223,6 @@ const styles = StyleSheet.create({
     margin: 16,
     backgroundColor: '#2196F3',
   },
-  headerRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: 16,
-  },
-  headerText: {
-    flex: 1,
-  },
   welcomeTitle: {
     color: 'white',
     fontSize: 20,
@@ -274,6 +231,7 @@ const styles = StyleSheet.create({
   welcomeSubtitle: {
     color: 'white',
     opacity: 0.9,
+    marginBottom: 16,
   },
   statsContainer: {
     flexDirection: 'row',

@@ -44,8 +44,6 @@ const ComplaintFormScreen = ({ navigation }) => {
 
     if (!formData.judul.trim()) {
       newErrors.judul = 'Judul pengaduan harus diisi';
-    } else if (formData.judul.length < 5) {
-      newErrors.judul = 'Judul minimal 5 karakter';
     }
 
     if (!formData.isi_laporan.trim()) {
@@ -101,7 +99,6 @@ const ComplaintFormScreen = ({ navigation }) => {
               style={styles.input}
               error={!!errors.judul}
               left={<TextInput.Icon icon="format-title" />}
-              placeholder="Masukkan judul pengaduan yang jelas"
             />
             <HelperText type="error" visible={!!errors.judul}>
               {errors.judul}
@@ -115,7 +112,6 @@ const ComplaintFormScreen = ({ navigation }) => {
               style={styles.input}
               error={!!errors.lokasi}
               left={<TextInput.Icon icon="map-marker" />}
-              placeholder="Contoh: Jl. Merdeka No. 123, RT 01/RW 02"
             />
             <HelperText type="error" visible={!!errors.lokasi}>
               {errors.lokasi}
@@ -146,7 +142,6 @@ const ComplaintFormScreen = ({ navigation }) => {
               numberOfLines={6}
               error={!!errors.isi_laporan}
               left={<TextInput.Icon icon="text" />}
-              placeholder="Jelaskan secara detail masalah yang terjadi..."
             />
             <HelperText type="error" visible={!!errors.isi_laporan}>
               {errors.isi_laporan}
@@ -159,7 +154,6 @@ const ComplaintFormScreen = ({ navigation }) => {
               mode="outlined"
               style={styles.input}
               left={<TextInput.Icon icon="camera" />}
-              placeholder="https://example.com/foto.jpg"
             />
             <HelperText type="info">
               Anda dapat menambahkan URL foto untuk mendukung laporan
@@ -180,7 +174,6 @@ const ComplaintFormScreen = ({ navigation }) => {
                 style={styles.submitButton}
                 loading={isLoading}
                 disabled={isLoading}
-                icon="send"
               >
                 {isLoading ? 'Mengirim...' : 'Kirim Pengaduan'}
               </Button>

@@ -20,51 +20,17 @@ function AppNavigator() {
 
   return (
     <NavigationContainer>
-      <Stack.Navigator 
-        screenOptions={{ 
-          headerShown: true,
-          headerStyle: {
-            backgroundColor: '#2196F3',
-          },
-          headerTintColor: '#fff',
-          headerTitleStyle: {
-            fontWeight: 'bold',
-          }
-        }}
-      >
+      <Stack.Navigator screenOptions={{ headerShown: false }}>
         {!user ? (
           <>
-            <Stack.Screen 
-              name="Login" 
-              component={LoginScreen}
-              options={{ headerShown: false }}
-            />
-            <Stack.Screen 
-              name="Register" 
-              component={RegisterScreen}
-              options={{ title: 'Daftar Akun' }}
-            />
+            <Stack.Screen name="Login" component={LoginScreen} />
+            <Stack.Screen name="Register" component={RegisterScreen} />
           </>
         ) : (
           <>
-            <Stack.Screen 
-              name="Dashboard" 
-              component={DashboardScreen}
-              options={{ 
-                title: `Halo, ${user.nama}`,
-                headerRight: () => null
-              }}
-            />
-            <Stack.Screen 
-              name="ComplaintForm" 
-              component={ComplaintFormScreen}
-              options={{ title: 'Buat Pengaduan' }}
-            />
-            <Stack.Screen 
-              name="ComplaintDetail" 
-              component={ComplaintDetailScreen}
-              options={{ title: 'Detail Pengaduan' }}
-            />
+            <Stack.Screen name="Dashboard" component={DashboardScreen} />
+            <Stack.Screen name="ComplaintForm" component={ComplaintFormScreen} />
+            <Stack.Screen name="ComplaintDetail" component={ComplaintDetailScreen} />
           </>
         )}
       </Stack.Navigator>
